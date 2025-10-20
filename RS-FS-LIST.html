@@ -1,4 +1,4 @@
-<!-- Helper Functions - Header Section: RS Full Send List Popup (Linked Store Version) -->
+<!-- Helper Functions - Header Section: RS Full Send List Popup (Linked Store Version - Live JSON) -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -15,13 +15,12 @@
     --accent:#10d1c6;
     --accent-2:#0aa29a;
     --shadow:0 20px 50px rgba(0,0,0,.6);
-    --row-h:46px;
   }
-  html,body{height:100%;margin:0;background:radial-gradient(1200px 600px at 50% -10%, rgba(16,209,198,.08), transparent 60%), var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;}
+  html,body{height:100%;margin:0;background:radial-gradient(1200px 600px at 50% -10%,rgba(16,209,198,.08),transparent 60%),var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;}
   .wrap{min-height:100%;display:grid;place-items:center;padding:24px}
-  .cta-btn{appearance:none;border:0;border-radius:16px;padding:14px 20px;font-weight:800;letter-spacing:.3px;background:linear-gradient(180deg,var(--accent),var(--accent-2));color:#021515;cursor:pointer;box-shadow:0 6px 18px rgba(10,162,154,.35);transition:transform .15s ease,box-shadow .2s ease}
+  .cta-btn{border:0;border-radius:16px;padding:14px 20px;font-weight:800;letter-spacing:.3px;background:linear-gradient(180deg,var(--accent),var(--accent-2));color:#021515;cursor:pointer;box-shadow:0 6px 18px rgba(10,162,154,.35);transition:transform .15s ease,box-shadow .2s ease}
   .cta-btn:hover{transform:translateY(-1px);box-shadow:0 10px 28px rgba(16,209,198,.35)}
-  .popup{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.98);opacity:0;pointer-events:none;width:min(1000px,92vw);height:min(78vh,860px);background:linear-gradient(180deg,#0d1113,#0a0d0f);border:1px solid var(--border);border-radius:20px;box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden;transition:opacity .2s ease,transform .2s ease;resize:both}
+  .popup{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.98);opacity:0;pointer-events:none;width:min(1000px,92vw);height:min(78vh,860px);background:linear-gradient(180deg,#0d1113,#0a0d0f);border:1px solid var(--border);border-radius:20px;box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden;transition:opacity .2s ease,transform .2s ease;resize:both;}
   .popup.show{opacity:1;transform:translate(-50%,-50%) scale(1);pointer-events:auto}
   .pop-header{display:flex;align-items:center;gap:14px;padding:14px 16px;background:linear-gradient(180deg,rgba(16,209,198,.08),rgba(16,209,198,.03));border-bottom:1px solid var(--border);cursor:move;user-select:none}
   .logo{width:34px;height:34px;object-fit:contain;filter:drop-shadow(0 0 10px rgba(16,209,198,.45))}
@@ -33,90 +32,65 @@
   .search input{flex:1}
   .stats{font-size:12px;color:var(--muted)}
   .table-wrap{flex:1;overflow:auto;background:radial-gradient(800px 400px at 50% 0%,rgba(16,209,198,.05),transparent 60%)}
-  table{width:100%;border-collapse:separate;border-spacing:0;table-layout:auto}
+  table{width:100%;border-collapse:separate;border-spacing:0}
   thead th{position:sticky;top:0;background:#0d1316;padding:12px 14px;border-bottom:1px solid var(--border);text-align:left;font-size:12px;color:#b7c4c8;font-weight:700;letter-spacing:.4px}
   tbody td{padding:10px 14px;border-bottom:1px solid #131a1d;white-space:nowrap;vertical-align:middle}
   tbody tr:hover{background:rgba(16,209,198,.04)}
-  .col-store{width:1%}
-  .col-sku{width:1%}
   .col-title{max-width:clamp(220px,32vw,560px);overflow:hidden;text-overflow:ellipsis}
-  .col-comps{width:1%}
-  .table-wrap{max-height:calc(var(--row-h)*10 + 56px)}
   .no-results{padding:28px;text-align:center;color:var(--muted)}
   .glow{height:1px;background:linear-gradient(90deg,transparent,rgba(16,209,198,.45),transparent)}
 </style>
 </head>
 <body>
-  <div class="wrap">
-    <button class="cta-btn" id="openRS">Open RS List</button>
+<div class="wrap"><button class="cta-btn" id="openRS">Open RS List</button></div>
+<div class="popup" id="rsPopup">
+  <div class="pop-header" id="dragHandle">
+    <img class="logo" src="https://i.imgur.com/XpaaWI4.png" alt="RS" />
+    <div class="title">RS – Full Send List</div>
+    <button class="close" id="closeRS">✕</button>
   </div>
-  <div class="popup" id="rsPopup" tabindex="-1" aria-modal="true" role="dialog">
-    <div class="pop-header" id="dragHandle">
-      <img class="logo" src="https://i.imgur.com/XpaaWI4.png" alt="RS" />
-      <div class="title">RS – Full Send List</div>
-      <button class="close" id="closeRS">✕</button>
+  <div class="toolbar">
+    <div class="search">
+      <input id="searchInput" type="text" placeholder="Type to filter…" />
+      <select id="filterBy">
+        <option value="all">All</option>
+        <option value="store">Store Name</option>
+        <option value="sku">SKU</option>
+      </select>
     </div>
-    <div class="toolbar">
-      <div class="search">
-        <input id="searchInput" type="text" placeholder="Type to filter…" />
-        <select id="filterBy">
-          <option value="all">All</option>
-          <option value="store">Store Name</option>
-          <option value="sku">SKU</option>
-        </select>
-      </div>
-      <div class="stats" id="stats">Loading…</div>
-    </div>
-    <div class="glow"></div>
-    <div class="table-wrap">
-      <table id="dataTable">
-        <thead>
-          <tr>
-            <th>Store Name</th>
-            <th>SKU</th>
-            <th>Product Title</th>
-            <th>Comps</th>
-          </tr>
-        </thead>
-        <tbody id="tbody"><tr><td colspan="4" class="no-results">Waiting for data…</td></tr></tbody>
-      </table>
-    </div>
+    <div class="stats" id="stats">Loading…</div>
   </div>
+  <div class="glow"></div>
+  <div class="table-wrap">
+    <table><thead><tr><th>Store</th><th>SKU</th><th>Product Title</th><th>Comps</th></tr></thead><tbody id="tbody"><tr><td colspan="4" class="no-results">Waiting for data…</td></tr></tbody></table>
+  </div>
+</div>
+
 <script>
 (() => {
-  const openBtn=document.getElementById('openRS');
-  const popup=document.getElementById('rsPopup');
-  const closeBtn=document.getElementById('closeRS');
-  const handle=document.getElementById('dragHandle');
-  const tbody=document.getElementById('tbody');
-  const stats=document.getElementById('stats');
-  const searchInput=document.getElementById('searchInput');
-  const filterBy=document.getElementById('filterBy');
-
-  // ===============================
-  // GUIDE: Paste your Google Sheet JSON link here
-  // ===============================
-  const SHEET_JSON_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vSMQtU9vKiJSYUi08Cjfz_hsudeZoWmRaO-vqb902ZU7-zR1vTEhb4LitrrvnktAX5YapS5tiKdI883/gviz/tq?tqx=out:json';
-
+  const SHEET_JSON_URL = 'https://script.google.com/macros/s/AKfycbxBmoyredIJsZwHkg6jt_FUc_WLy94x3TvpXxESfUKVX9OXfopRM2grHXeqPgXLPfvV2g/exec';
+  const openBtn=document.getElementById('openRS'),popup=document.getElementById('rsPopup'),closeBtn=document.getElementById('closeRS'),handle=document.getElementById('dragHandle'),tbody=document.getElementById('tbody'),stats=document.getElementById('stats'),searchInput=document.getElementById('searchInput'),filterBy=document.getElementById('filterBy');
   let rawRows=[];
-  let headerIndex={};
-
   async function loadData(){
     stats.textContent='Loading…';
     try{
       const res=await fetch(SHEET_JSON_URL,{cache:'no-store'});
-      const txt=await res.text();
-      const json=JSON.parse(txt.replace(/^.*?\(/,'').replace(/\);?\s*$/,''));
-      const cols=json.table.cols.map(c=>c.label||'');
-      const rows=json.table.rows.map(r=>(r.c||[]).map(c=>c&&c.v?String(c.v):''));
-      headerIndex=mapHeaders(cols);
+      const rows=await res.json();
+      const header=rows.shift();
+      const idx={
+        store:header.findIndex(h=>/store/i.test(h)),
+        sku:header.findIndex(h=>/sku|upc/i.test(h)),
+        title:header.findIndex(h=>/title/i.test(h)),
+        link:header.findIndex(h=>/link/i.test(h)),
+        comps:header.findIndex(h=>/comps/i.test(h))
+      };
       rawRows=rows.map(r=>({
-        store:r[headerIndex.store]||'',
-        link:r[headerIndex.link]||'',
-        sku:r[headerIndex.sku]||'',
-        title:r[headerIndex.title]||'',
-        comps:r[headerIndex.comps]||''
-      })).filter(r=>r.store||r.sku||r.title);
+        store:r[idx.store]||'',
+        link:r[idx.link]||'',
+        sku:r[idx.sku]||'',
+        title:r[idx.title]||'',
+        comps:r[idx.comps]||''
+      })).filter(r=>r.store||r.title);
       render(rawRows);
       stats.textContent=`${rawRows.length} items`;
     }catch(e){
@@ -125,23 +99,9 @@
     }
   }
 
-  function mapHeaders(cols){
-    const lower=cols.map(c=>c.toLowerCase());
-    const find=keys=>lower.findIndex(h=>keys.some(k=>h.includes(k)));
-    return {
-      store:find(['store']),
-      link:find(['store link','link']),
-      sku:find(['sku','upc','id']),
-      title:find(['title','product']),
-      comps:find(['comps','ebay'])
-    };
-  }
-
   function normalize(v){return String(v||'').toLowerCase();}
-
   function filterRows(){
-    const q=normalize(searchInput.value);
-    const mode=filterBy.value;
+    const q=normalize(searchInput.value),mode=filterBy.value;
     const filtered=rawRows.filter(r=>{
       if(!q)return true;
       if(mode==='store')return normalize(r.store).includes(q);
@@ -152,70 +112,28 @@
     stats.textContent=`${filtered.length} shown of ${rawRows.length}`;
   }
 
-  function toCell(content,cls){
-    const td=document.createElement('td');
-    if(cls)td.className=cls;
-    td.textContent=content;
-    return td;
-  }
-
   function render(rows){
-    if(!rows.length){
-      tbody.innerHTML='<tr><td colspan="4" class="no-results">No results found</td></tr>';
-      return;
-    }
+    if(!rows.length){tbody.innerHTML='<tr><td colspan="4" class="no-results">No results found</td></tr>';return;}
     tbody.innerHTML='';
     rows.forEach(r=>{
       const tr=document.createElement('tr');
-      const storeTd=document.createElement('td');
-      if(r.link){
-        const a=document.createElement('a');
-        a.href=r.link;a.target='_blank';a.rel='noopener';a.textContent=r.store||'Store';
-        a.style.color='var(--accent)';a.style.textDecoration='none';
-        a.onmouseover=()=>a.style.textShadow='0 0 6px rgba(16,209,198,.7)';
-        a.onmouseout=()=>a.style.textShadow='';
-        storeTd.appendChild(a);
-      }else storeTd.textContent=r.store;
-      storeTd.className='col-store';
-      tr.appendChild(storeTd);
-      tr.appendChild(toCell(r.sku,'col-sku'));
-      const tdTitle=toCell(r.title,'col-title');tdTitle.title=r.title;tr.appendChild(tdTitle);
-      const compsTd=document.createElement('td');
-      if(/^https?:\/\//.test(r.comps)){
-        const a=document.createElement('a');
-        a.href=r.comps;a.target='_blank';a.rel='noopener';a.textContent='Open';
-        a.style.color='var(--accent)';a.style.textDecoration='none';
-        a.onmouseover=()=>a.style.textDecoration='underline';
-        a.onmouseout=()=>a.style.textDecoration='none';
-        compsTd.appendChild(a);
-      }else compsTd.textContent=r.comps;
-      compsTd.className='col-comps';
-      tr.appendChild(compsTd);
+      const tdStore=document.createElement('td');
+      if(r.link){const a=document.createElement('a');a.href=r.link;a.target='_blank';a.textContent=r.store;a.style.color='var(--accent)';a.style.textDecoration='none';tdStore.appendChild(a);} else tdStore.textContent=r.store;
+      tr.appendChild(tdStore);
+      tr.innerHTML+=`<td>${r.sku}</td><td title="${r.title}">${r.title}</td><td>${/^https?:/.test(r.comps)?'<a href="'+r.comps+'" target="_blank" style="color:var(--accent)">Open</a>':r.comps}</td>`;
       tbody.appendChild(tr);
     });
   }
 
   // Drag logic
   let drag=false,sx,sy,sl,st;
-  handle.onmousedown=e=>{
-    if(e.target.closest('button'))return;
-    drag=true;sx=e.clientX;sy=e.clientY;
-    const rect=popup.getBoundingClientRect();sl=rect.left;st=rect.top;
-    document.body.style.userSelect='none';
-  };
-  window.onmousemove=e=>{
-    if(!drag)return;
-    popup.style.left=sl+e.clientX-sx+'px';
-    popup.style.top=st+e.clientY-sy+'px';
-    popup.style.transform='translate(0,0)';
-  };
+  handle.onmousedown=e=>{if(e.target.closest('button'))return;drag=true;sx=e.clientX;sy=e.clientY;const rect=popup.getBoundingClientRect();sl=rect.left;st=rect.top;document.body.style.userSelect='none';};
+  window.onmousemove=e=>{if(!drag)return;popup.style.left=sl+e.clientX-sx+'px';popup.style.top=st+e.clientY-sy+'px';popup.style.transform='translate(0,0)';};
   window.onmouseup=()=>{drag=false;document.body.style.userSelect='';};
 
   openBtn.onclick=()=>{popup.classList.add('show');popup.focus();if(!rawRows.length)loadData();};
   closeBtn.onclick=()=>popup.classList.remove('show');
-  window.onkeydown=e=>{if(e.key==='Escape')popup.classList.remove('show');};
-  searchInput.oninput=filterRows;
-  filterBy.onchange=filterRows;
+  searchInput.oninput=filterRows;filterBy.onchange=filterRows;
 })();
 </script>
 </body>
