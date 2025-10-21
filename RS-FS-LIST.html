@@ -1,4 +1,4 @@
-<!-- Helper Functions - Header Section: RS Full Send List Popup (Linked Store Version - Live JSON) -->
+<!-- Helper Functions - Header Section: RS Full Send List Popup (Multi-Level Filter Final Build) -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,14 +7,8 @@
 <title>RS – Full Send List</title>
 <style>
   :root {
-    --bg:#0c0f10;
-    --panel:#111417;
-    --border:#1f2a30;
-    --text:#e8f1f2;
-    --muted:#a8b3b8;
-    --accent:#10d1c6;
-    --accent-2:#0aa29a;
-    --shadow:0 20px 50px rgba(0,0,0,.6);
+    --bg:#0c0f10;--panel:#111417;--border:#1f2a30;--text:#e8f1f2;
+    --muted:#a8b3b8;--accent:#10d1c6;--accent-2:#0aa29a;--shadow:0 20px 50px rgba(0,0,0,.6);
   }
   html,body{height:100%;margin:0;background:radial-gradient(1200px 600px at 50% -10%,rgba(16,209,198,.08),transparent 60%),var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;}
   .wrap{min-height:100%;display:grid;place-items:center;padding:24px}
@@ -26,51 +20,73 @@
   .logo{width:34px;height:34px;object-fit:contain;filter:drop-shadow(0 0 10px rgba(16,209,198,.45))}
   .title{font-weight:900;letter-spacing:.6px}
   .close{margin-left:auto;display:inline-grid;place-items:center;width:36px;height:36px;border-radius:10px;background:#12181b;border:1px solid var(--border);color:var(--text);cursor:pointer}
-  .toolbar{display:flex;gap:10px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border);background:#0c1113}
-  .search{flex:1;display:flex;gap:10px}
+  .toolbar{display:flex;gap:10px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border);background:#0c1113;flex-wrap:wrap}
+  .search{flex:1;display:flex;gap:10px;min-width:200px;align-items:center;flex-wrap:wrap}
   .search input,.search select{height:40px;border-radius:12px;border:1px solid var(--border);background:#0b0f12;color:var(--text);padding:0 12px}
-  .search input{flex:1}
+  .search input{flex:1;min-width:160px}
   .stats{font-size:12px;color:var(--muted)}
   .table-wrap{flex:1;overflow:auto;background:radial-gradient(800px 400px at 50% 0%,rgba(16,209,198,.05),transparent 60%)}
-  table{width:100%;border-collapse:separate;border-spacing:0}
-  thead th{position:sticky;top:0;background:#0d1316;padding:12px 14px;border-bottom:1px solid var(--border);text-align:left;font-size:12px;color:#b7c4c8;font-weight:700;letter-spacing:.4px}
-  tbody td{padding:10px 14px;border-bottom:1px solid #131a1d;white-space:nowrap;vertical-align:middle}
+  table{width:100%;border-collapse:separate;border-spacing:0;table-layout:auto}
+  thead th{position:sticky;top:0;background:#0d1316;padding:10px 8px;border-bottom:1px solid var(--border);text-align:left;font-size:12px;color:#b7c4c8;font-weight:700;letter-spacing:.4px}
+  thead th:nth-child(1){width:15%}
+  thead th:nth-child(2){width:15%}
+  thead th:nth-child(3){width:auto}
+  thead th:nth-child(4){width:10%}
+  tbody td{padding:8px 10px;border-bottom:1px solid #131a1d;white-space:nowrap;vertical-align:middle;font-size:13px;text-overflow:ellipsis;overflow:hidden}
   tbody tr:hover{background:rgba(16,209,198,.04)}
-  .col-title{max-width:clamp(220px,32vw,560px);overflow:hidden;text-overflow:ellipsis}
+  .col-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .no-results{padding:28px;text-align:center;color:var(--muted)}
   .glow{height:1px;background:linear-gradient(90deg,transparent,rgba(16,209,198,.45),transparent)}
+  tbody td:nth-child(2){text-transform:uppercase}
+  @media(max-width:700px){
+    .popup{width:95vw;height:80vh}
+    .search select,.search input{flex:1 1 100%}
+    thead th,tbody td{font-size:11px;padding:6px}
+  }
 </style>
 </head>
 <body>
 <div class="wrap"><button class="cta-btn" id="openRS">Open RS List</button></div>
+
 <div class="popup" id="rsPopup">
   <div class="pop-header" id="dragHandle">
     <img class="logo" src="https://i.imgur.com/XpaaWI4.png" alt="RS" />
     <div class="title">RS – Full Send List</div>
     <button class="close" id="closeRS">✕</button>
   </div>
+
   <div class="toolbar">
     <div class="search">
+      <select id="catSelect"><option value="">All Categories</option></select>
+      <select id="storeSelect"><option value="">All Stores</option></select>
       <input id="searchInput" type="text" placeholder="Type to filter…" />
-      <select id="filterBy">
-        <option value="all">All</option>
-        <option value="store">Store Name</option>
-        <option value="sku">SKU</option>
-      </select>
     </div>
     <div class="stats" id="stats">Loading…</div>
   </div>
+
   <div class="glow"></div>
   <div class="table-wrap">
-    <table><thead><tr><th>Store</th><th>SKU</th><th>Product Title</th><th>Comps</th></tr></thead><tbody id="tbody"><tr><td colspan="4" class="no-results">Waiting for data…</td></tr></tbody></table>
+    <table>
+      <thead><tr><th>Store</th><th>SKU</th><th>Product Title</th><th>Comps</th></tr></thead>
+      <tbody id="tbody"><tr><td colspan="4" class="no-results">Waiting for data…</td></tr></tbody>
+    </table>
   </div>
 </div>
 
 <script>
 (() => {
-  const SHEET_JSON_URL = 'https://script.google.com/macros/s/AKfycbxBmoyredIJsZwHkg6jt_FUc_WLy94x3TvpXxESfUKVX9OXfopRM2grHXeqPgXLPfvV2g/exec';
-  const openBtn=document.getElementById('openRS'),popup=document.getElementById('rsPopup'),closeBtn=document.getElementById('closeRS'),handle=document.getElementById('dragHandle'),tbody=document.getElementById('tbody'),stats=document.getElementById('stats'),searchInput=document.getElementById('searchInput'),filterBy=document.getElementById('filterBy');
-  let rawRows=[];
+  const SHEET_JSON_URL='https://script.google.com/macros/s/AKfycbxBmoyredIJsZwHkg6jt_FUc_WLy94x3TvpXxESfUKVX9OXfopRM2grHXeqPgXLPfvV2g/exec';
+  const openBtn=document.getElementById('openRS'),
+        popup=document.getElementById('rsPopup'),
+        closeBtn=document.getElementById('closeRS'),
+        handle=document.getElementById('dragHandle'),
+        tbody=document.getElementById('tbody'),
+        stats=document.getElementById('stats'),
+        searchInput=document.getElementById('searchInput'),
+        catSelect=document.getElementById('catSelect'),
+        storeSelect=document.getElementById('storeSelect');
+  let rawRows=[],uniqueCats=[],uniqueStores=[];
+
   async function loadData(){
     stats.textContent='Loading…';
     try{
@@ -78,35 +94,53 @@
       const rows=await res.json();
       const header=rows.shift();
       const idx={
-        store:header.findIndex(h=>/store/i.test(h)),
+        store:header.findIndex(h=>/store/i.test(h)&&!/header/i.test(h)),
         sku:header.findIndex(h=>/sku|upc/i.test(h)),
         title:header.findIndex(h=>/title/i.test(h)),
         link:header.findIndex(h=>/link/i.test(h)),
-        comps:header.findIndex(h=>/comps/i.test(h))
+        comps:header.findIndex(h=>/comps/i.test(h)),
+        category:header.findIndex(h=>/^category$/i.test(h)),
+        catHeader:header.findIndex(h=>/category\s*header/i.test(h))
       };
-      rawRows=rows.map(r=>({
+      rawRows=rows.filter(r=>r[idx.store]||r[idx.title]).map(r=>({
         store:r[idx.store]||'',
         link:r[idx.link]||'',
         sku:r[idx.sku]||'',
         title:r[idx.title]||'',
-        comps:r[idx.comps]||''
-      })).filter(r=>r.store||r.title);
+        comps:r[idx.comps]||'',
+        category:r[idx.category]||''
+      }));
+      const fromData=[...new Set(rawRows.map(r=>r.category).filter(Boolean))];
+      const fromHeader=rows.map(r=>r[idx.catHeader]).filter(Boolean);
+      uniqueCats=[...new Set([...fromData,...fromHeader])].sort();
+      catSelect.innerHTML='<option value="">All Categories</option>'+uniqueCats.map(c=>`<option value="${c}">${c}</option>`).join('');
+      updateStoreList();
       render(rawRows);
       stats.textContent=`${rawRows.length} items`;
     }catch(e){
+      console.error(e);
       tbody.innerHTML='<tr><td colspan="4" class="no-results">Failed to load data</td></tr>';
       stats.textContent='Load error';
     }
   }
 
   function normalize(v){return String(v||'').toLowerCase();}
+  function updateStoreList(){
+    const selectedCat=normalize(catSelect.value);
+    const stores=rawRows.filter(r=>!selectedCat||normalize(r.category)===selectedCat).map(r=>r.store).filter(Boolean);
+    uniqueStores=[...new Set(stores)].sort();
+    storeSelect.innerHTML='<option value="">All Stores</option>'+uniqueStores.map(s=>`<option value="${s}">${s}</option>`).join('');
+  }
+
   function filterRows(){
-    const q=normalize(searchInput.value),mode=filterBy.value;
+    const catVal=normalize(catSelect.value),
+          storeVal=normalize(storeSelect.value),
+          q=normalize(searchInput.value);
     const filtered=rawRows.filter(r=>{
-      if(!q)return true;
-      if(mode==='store')return normalize(r.store).includes(q);
-      if(mode==='sku')return normalize(r.sku).includes(q);
-      return normalize(r.store).includes(q)||normalize(r.sku).includes(q)||normalize(r.title).includes(q)||normalize(r.comps).includes(q);
+      if(catVal && normalize(r.category)!==catVal) return false;
+      if(storeVal && normalize(r.store)!==storeVal) return false;
+      if(q && !(normalize(r.title).includes(q)||normalize(r.sku).includes(q)||normalize(r.comps).includes(q))) return false;
+      return true;
     });
     render(filtered);
     stats.textContent=`${filtered.length} shown of ${rawRows.length}`;
@@ -118,9 +152,14 @@
     rows.forEach(r=>{
       const tr=document.createElement('tr');
       const tdStore=document.createElement('td');
-      if(r.link){const a=document.createElement('a');a.href=r.link;a.target='_blank';a.textContent=r.store;a.style.color='var(--accent)';a.style.textDecoration='none';tdStore.appendChild(a);} else tdStore.textContent=r.store;
+      if(r.link){
+        const a=document.createElement('a');
+        a.href=r.link;a.target='_blank';
+        a.textContent=r.store;a.style.color='var(--accent)';a.style.textDecoration='none';
+        tdStore.appendChild(a);
+      }else tdStore.textContent=r.store;
       tr.appendChild(tdStore);
-      tr.innerHTML+=`<td>${r.sku}</td><td title="${r.title}">${r.title}</td><td>${/^https?:/.test(r.comps)?'<a href="'+r.comps+'" target="_blank" style="color:var(--accent)">Open</a>':r.comps}</td>`;
+      tr.innerHTML+=`<td>${r.sku}</td><td class="col-title" title="${r.title}">${r.title}</td><td>${/^https?:/.test(r.comps)?'<a href="'+r.comps+'" target="_blank" style="color:var(--accent)">Open</a>':r.comps}</td>`;
       tbody.appendChild(tr);
     });
   }
@@ -133,7 +172,10 @@
 
   openBtn.onclick=()=>{popup.classList.add('show');popup.focus();if(!rawRows.length)loadData();};
   closeBtn.onclick=()=>popup.classList.remove('show');
-  searchInput.oninput=filterRows;filterBy.onchange=filterRows;
+
+  catSelect.onchange=()=>{updateStoreList();filterRows();};
+  storeSelect.onchange=filterRows;
+  searchInput.oninput=filterRows;
 })();
 </script>
 </body>
