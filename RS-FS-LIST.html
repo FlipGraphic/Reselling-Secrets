@@ -16,6 +16,8 @@
   .cta-btn:hover{transform:translateY(-1px);box-shadow:0 10px 28px rgba(16,209,198,.35)}
   .popup{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.98);opacity:0;pointer-events:none;width:min(1000px,92vw);height:min(78vh,860px);background:linear-gradient(180deg,#0d1113,#0a0d0f);border:1px solid var(--border);border-radius:20px;box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden;transition:opacity .2s ease,transform .2s ease;resize:both;}
   .popup.show{opacity:1;transform:translate(-50%,-50%) scale(1);pointer-events:auto}
+  .popup:focus{outline:none}
+  .popup.dragging{transition:none}
   .pop-header{display:flex;align-items:center;gap:14px;padding:14px 16px;background:linear-gradient(180deg,rgba(16,209,198,.08),rgba(16,209,198,.03));border-bottom:1px solid var(--border);cursor:move;user-select:none}
   .logo{width:34px;height:34px;object-fit:contain;filter:drop-shadow(0 0 10px rgba(16,209,198,.45))}
   .title{font-weight:900;letter-spacing:.6px}
@@ -48,11 +50,11 @@
 <body>
 <div class="wrap"><button class="cta-btn" id="openRS">Open RS List</button></div>
 
-<div class="popup" id="rsPopup">
+<div class="popup" id="rsPopup" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="dialogTitle" tabindex="-1">
   <div class="pop-header" id="dragHandle">
     <img class="logo" src="https://i.imgur.com/XpaaWI4.png" alt="RS" />
-    <div class="title">RS – Full Send List</div>
-    <button class="close" id="closeRS">✕</button>
+    <div class="title" id="dialogTitle">RS – Full Send List</div>
+    <button class="close" id="closeRS" type="button" aria-label="Close">✕</button>
   </div>
 
   <div class="toolbar">
@@ -61,7 +63,7 @@
       <select id="storeSelect"><option value="">All Stores</option></select>
       <input id="searchInput" type="text" placeholder="Type to filter…" />
     </div>
-    <div class="stats" id="stats">Loading…</div>
+    <div class="stats" id="stats" aria-live="polite" aria-atomic="true">Loading…</div>
   </div>
 
   <div class="glow"></div>
@@ -86,12 +88,24 @@
         catSelect=document.getElementById('catSelect'),
         storeSelect=document.getElementById('storeSelect');
   let rawRows=[],uniqueCats=[],uniqueStores=[];
+  let lastFocused=null; // track last focused element to restore on close
+
+  const focusableSelectors='a[href],button:not([disabled]),input,select,textarea,[tabindex]:not([tabindex="-1"])';
+
+  function isHttpUrl(u){
+    try{const url=new URL(u);return url.protocol==='http:'||url.protocol==='https:';}catch{return false}
+  }
 
   async function loadData(){
     stats.textContent='Loading…';
+    stats.setAttribute('aria-busy','true');
     try{
       const res=await fetch(SHEET_JSON_URL,{cache:'no-store'});
+      if(!res.ok) throw new Error('Failed to fetch: '+res.status);
       const rows=await res.json();
+      if(!Array.isArray(rows) || rows.length===0){
+        throw new Error('No data returned');
+      }
       const header=rows.shift();
       const idx={
         store:header.findIndex(h=>/store/i.test(h)&&!/header/i.test(h)),
@@ -102,18 +116,32 @@
         category:header.findIndex(h=>/^category$/i.test(h)),
         catHeader:header.findIndex(h=>/category\s*header/i.test(h))
       };
-      rawRows=rows.filter(r=>r[idx.store]||r[idx.title]).map(r=>({
-        store:r[idx.store]||'',
-        link:r[idx.link]||'',
-        sku:r[idx.sku]||'',
-        title:r[idx.title]||'',
-        comps:r[idx.comps]||'',
-        category:r[idx.category]||''
+      rawRows=rows.filter(r=>{
+        const storeVal=idx.store>-1?r[idx.store]:'';
+        const titleVal=idx.title>-1?r[idx.title]:'';
+        return storeVal||titleVal;
+      }).map(r=>({
+        store:idx.store>-1?(r[idx.store]||''):'',
+        link:idx.link>-1?(r[idx.link]||''):'',
+        sku:idx.sku>-1?(r[idx.sku]||''):'',
+        title:idx.title>-1?(r[idx.title]||''):'',
+        comps:String(idx.comps>-1?(r[idx.comps]??''):'')||'',
+        category:idx.category>-1?(r[idx.category]||''):''
       }));
       const fromData=[...new Set(rawRows.map(r=>r.category).filter(Boolean))];
-      const fromHeader=rows.map(r=>r[idx.catHeader]).filter(Boolean);
+      const fromHeader=idx.catHeader>-1?rows.map(r=>r[idx.catHeader]).filter(Boolean):[];
       uniqueCats=[...new Set([...fromData,...fromHeader])].sort();
-      catSelect.innerHTML='<option value="">All Categories</option>'+uniqueCats.map(c=>`<option value="${c}">${c}</option>`).join('');
+      // rebuild category options safely
+      const prevCatVal=catSelect.value;
+      catSelect.innerHTML='';
+      const allOpt=document.createElement('option');
+      allOpt.value='';
+      allOpt.textContent='All Categories';
+      catSelect.appendChild(allOpt);
+      uniqueCats.forEach(c=>{
+        const opt=document.createElement('option');
+        opt.value=c; opt.textContent=c; if(prevCatVal&&prevCatVal===c) opt.selected=true; catSelect.appendChild(opt);
+      });
       updateStoreList();
       render(rawRows);
       stats.textContent=`${rawRows.length} items`;
@@ -121,6 +149,8 @@
       console.error(e);
       tbody.innerHTML='<tr><td colspan="4" class="no-results">Failed to load data</td></tr>';
       stats.textContent='Load error';
+    } finally {
+      stats.removeAttribute('aria-busy');
     }
   }
 
@@ -129,7 +159,15 @@
     const selectedCat=normalize(catSelect.value);
     const stores=rawRows.filter(r=>!selectedCat||normalize(r.category)===selectedCat).map(r=>r.store).filter(Boolean);
     uniqueStores=[...new Set(stores)].sort();
-    storeSelect.innerHTML='<option value="">All Stores</option>'+uniqueStores.map(s=>`<option value="${s}">${s}</option>`).join('');
+    const prevStoreVal=storeSelect.value;
+    storeSelect.innerHTML='';
+    const allOpt=document.createElement('option');
+    allOpt.value=''; allOpt.textContent='All Stores';
+    storeSelect.appendChild(allOpt);
+    uniqueStores.forEach(s=>{
+      const opt=document.createElement('option');
+      opt.value=s; opt.textContent=s; if(prevStoreVal&&prevStoreVal===s) opt.selected=true; storeSelect.appendChild(opt);
+    });
   }
 
   function filterRows(){
@@ -149,29 +187,95 @@
   function render(rows){
     if(!rows.length){tbody.innerHTML='<tr><td colspan="4" class="no-results">No results found</td></tr>';return;}
     tbody.innerHTML='';
+    const frag=document.createDocumentFragment();
     rows.forEach(r=>{
       const tr=document.createElement('tr');
+
+      // Store
       const tdStore=document.createElement('td');
-      if(r.link){
+      if(r.link && isHttpUrl(r.link)){
         const a=document.createElement('a');
-        a.href=r.link;a.target='_blank';
-        a.textContent=r.store;a.style.color='var(--accent)';a.style.textDecoration='none';
+        a.href=r.link; a.target='_blank'; a.rel='noopener noreferrer';
+        a.textContent=r.store; a.style.color='var(--accent)'; a.style.textDecoration='none';
         tdStore.appendChild(a);
-      }else tdStore.textContent=r.store;
+      }else{
+        tdStore.textContent=r.store;
+      }
       tr.appendChild(tdStore);
-      tr.innerHTML+=`<td>${r.sku}</td><td class="col-title" title="${r.title}">${r.title}</td><td>${/^https?:/.test(r.comps)?'<a href="'+r.comps+'" target="_blank" style="color:var(--accent)">Open</a>':r.comps}</td>`;
-      tbody.appendChild(tr);
+
+      // SKU
+      const tdSku=document.createElement('td');
+      tdSku.textContent=r.sku; tr.appendChild(tdSku);
+
+      // Title
+      const tdTitle=document.createElement('td');
+      tdTitle.className='col-title'; tdTitle.title=r.title; tdTitle.textContent=r.title; tr.appendChild(tdTitle);
+
+      // Comps
+      const tdComps=document.createElement('td');
+      if(r.comps && isHttpUrl(r.comps)){
+        const a=document.createElement('a');
+        a.href=r.comps; a.target='_blank'; a.rel='noopener noreferrer'; a.textContent='Open'; a.style.color='var(--accent)';
+        tdComps.appendChild(a);
+      }else{
+        tdComps.textContent=r.comps;
+      }
+      tr.appendChild(tdComps);
+
+      frag.appendChild(tr);
     });
+    tbody.appendChild(frag);
   }
 
-  // Drag logic
-  let drag=false,sx,sy,sl,st;
-  handle.onmousedown=e=>{if(e.target.closest('button'))return;drag=true;sx=e.clientX;sy=e.clientY;const rect=popup.getBoundingClientRect();sl=rect.left;st=rect.top;document.body.style.userSelect='none';};
-  window.onmousemove=e=>{if(!drag)return;popup.style.left=sl+e.clientX-sx+'px';popup.style.top=st+e.clientY-sy+'px';popup.style.transform='translate(0,0)';};
-  window.onmouseup=()=>{drag=false;document.body.style.userSelect='';};
+  // Drag logic (avoid transform conflicts)
+  let dragging=false,sx,sy,sl,st;
+  handle.onmousedown=e=>{
+    if(e.target.closest('button'))return;
+    dragging=true; sx=e.clientX; sy=e.clientY;
+    const rect=popup.getBoundingClientRect(); sl=rect.left; st=rect.top;
+    popup.classList.add('dragging');
+    popup.style.transform='none';
+    document.body.style.userSelect='none';
+  };
+  window.onmousemove=e=>{
+    if(!dragging) return;
+    popup.style.left=sl+e.clientX-sx+'px';
+    popup.style.top=st+e.clientY-sy+'px';
+  };
+  window.onmouseup=()=>{dragging=false;popup.classList.remove('dragging');document.body.style.userSelect='';};
 
-  openBtn.onclick=()=>{popup.classList.add('show');popup.focus();if(!rawRows.length)loadData();};
-  closeBtn.onclick=()=>popup.classList.remove('show');
+  function openDialog(){
+    lastFocused=document.activeElement;
+    // reset to centered state for consistent animation
+    popup.style.left=''; popup.style.top=''; popup.style.transform=''; popup.classList.remove('dragging');
+    popup.classList.add('show');
+    popup.setAttribute('aria-hidden','false');
+    if(!rawRows.length) loadData();
+    // focus first focusable
+    const focusables=popup.querySelectorAll(focusableSelectors);
+    const first=focusables[0];
+    (first||popup).focus();
+  }
+  function closeDialog(){
+    popup.classList.remove('show');
+    popup.setAttribute('aria-hidden','true');
+    if(lastFocused && typeof lastFocused.focus==='function') lastFocused.focus();
+  }
+
+  openBtn.onclick=openDialog;
+  closeBtn.onclick=closeDialog;
+
+  // keyboard: Escape to close, Tab trap
+  popup.addEventListener('keydown',e=>{
+    if(e.key==='Escape'){ e.preventDefault(); closeDialog(); return; }
+    if(e.key==='Tab'){
+      const focusables=[...popup.querySelectorAll(focusableSelectors)].filter(el=>el.offsetParent!==null);
+      if(focusables.length===0){ e.preventDefault(); return; }
+      const first=focusables[0], last=focusables[focusables.length-1];
+      if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
+      else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
+    }
+  });
 
   catSelect.onchange=()=>{updateStoreList();filterRows();};
   storeSelect.onchange=filterRows;
